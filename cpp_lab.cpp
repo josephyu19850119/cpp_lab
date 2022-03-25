@@ -52,9 +52,12 @@ void init()
 
     boost::log::core::get()->set_filter(
         boost::log::trivial::severity >= boost::log::trivial::info);
+        
+    boost::log::add_common_attributes();
 }
 
-#define MY_GLOBAL_LOGGER(log_, sv) BOOST_LOG_SEV(log_, sv)                            \
+boost::log::sources::severity_logger<boost::log::trivial::severity_level> lg;
+#define MY_GLOBAL_LOGGER(sv) BOOST_LOG_SEV(lg, sv)                            \
                                        << boost::log::add_value("Line", __LINE__)     \
                                        << boost::log::add_value("File", __FILE__)     \
                                        << boost::log::add_value("Function", __func__) 
@@ -62,14 +65,12 @@ void init()
 int main(int, char *[])
 {
     init();
-    boost::log::add_common_attributes();
 
-    boost::log::sources::severity_logger<boost::log::trivial::severity_level> lg;
 
-    MY_GLOBAL_LOGGER(lg, boost::log::trivial::debug) << "Keep";
-    MY_GLOBAL_LOGGER(lg, boost::log::trivial::info) << "It";
-    MY_GLOBAL_LOGGER(lg, boost::log::trivial::warning) << "Simple";
-    MY_GLOBAL_LOGGER(lg, boost::log::trivial::error) << "Stupid";
+    MY_GLOBAL_LOGGER(boost::log::trivial::debug) << "Keep";
+    MY_GLOBAL_LOGGER(boost::log::trivial::info) << "It";
+    MY_GLOBAL_LOGGER(boost::log::trivial::warning) << "Simple";
+    MY_GLOBAL_LOGGER(boost::log::trivial::error) << "Stupid";
 
     return 0;
 }
