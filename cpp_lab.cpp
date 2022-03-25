@@ -11,15 +11,21 @@
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/format.hpp>
 
-void init()
+void init(boost::log::trivial::severity_level aware_level = boost::log::trivial::severity_level::info, const std::string &log_file_path = "")
 {
     typedef boost::log::sinks::synchronous_sink<boost::log::sinks::text_ostream_backend> text_sink;
     boost::shared_ptr<text_sink> sink = boost::make_shared<text_sink>();
 
-    sink->locked_backend()->add_stream(
-        boost::make_shared<std::ofstream>("sample.log"));
-    // sink->locked_backend()->add_stream(
-    //     boost::shared_ptr<std::ostream>(&std::clog, boost::null_deleter()));
+    if (log_file_path.empty())
+    {
+        sink->locked_backend()->add_stream(
+            boost::shared_ptr<std::ostream>(&std::clog, boost::null_deleter()));
+    }
+    else
+    {
+        sink->locked_backend()->add_stream(
+            boost::make_shared<std::ofstream>(log_file_path));
+    }
 
     sink->set_formatter([](boost::log::record_view const &rec, boost::log::formatting_ostream &strm)
                         {
@@ -44,7 +50,7 @@ void init()
     boost::log::core::get()->add_sink(sink);
 
     boost::log::core::get()->set_filter(
-        boost::log::trivial::severity >= boost::log::trivial::info);
+        boost::log::trivial::severity >= aware_level);
 
     boost::log::add_common_attributes();
 }
@@ -57,7 +63,7 @@ boost::log::sources::severity_logger<boost::log::trivial::severity_level> lg;
 
 int main(int, char *[])
 {
-    init();
+    init(boost::log::trivial::severity_level::debug, "debug.log");
 
     MY_GLOBAL_LOGGER(boost::log::trivial::debug) << "Keep";
     MY_GLOBAL_LOGGER(boost::log::trivial::info) << "It";
