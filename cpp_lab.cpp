@@ -1,15 +1,23 @@
-#include <iostream>
-
+#include <chrono>
 using namespace std;
 
-#include <boost/version.hpp>
+#include <boost/log/trivial.hpp>
+
+#include "timer.hpp"
 
 int main(int argc, char **argv)
 {
-    cout << "Hello C++ lab" << endl;
+    timer t;
+    int count = 0;
+    t.set(chrono::duration<int, micro>(1000000), &count, [](void *p)
+          { 
+              int* count = static_cast<int*>(p);
+              if (*count == 10) {
+                  return false;
+              }
+              BOOST_LOG_TRIVIAL(info) << "tick tock: " << (*count)++;
+              return true; });
 
-    cout << "C++ std: " << __cplusplus << endl;
-    cout << "boost version: " << BOOST_LIB_VERSION << endl;
-
+    pause();
     return 0;
 }
