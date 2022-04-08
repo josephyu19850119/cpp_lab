@@ -1,4 +1,5 @@
 #include <chrono>
+#include <thread>
 using namespace std;
 
 #include <boost/log/trivial.hpp>
@@ -7,16 +8,28 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
-    timer t;
     int count = 0;
-    t.set(chrono::duration<int, micro>(1000000), &count, [](void *p)
-          { 
-              int* count = static_cast<int*>(p);
-              if (*count == 10) {
-                  return false;
-              }
-              BOOST_LOG_TRIVIAL(info) << "tick tock: " << (*count)++;
-              return true; });
+    // 每1000微秒(0.001秒)回调一次，1000次后取消
+    timer::timer_handle t = timer::set(chrono::duration<int, micro>(1000), &count, [](void *p) { 
+        int* count = static_cast<int*>(p);
+        BOOST_LOG_TRIVIAL(info) << "tick tock: " << ++(*count);
+        return true; });
+
+    while (count < 100)
+    {
+        std::this_thread::yield();
+    }
+
+    timer::cancel(t);
+
+    // 每1000微秒(0.001秒)回调一次，count降为0时主动停止
+    t = timer::set(chrono::duration<int, micro>(1000), &count, [](void *p) {
+        int* count = static_cast<int*>(p);
+        BOOST_LOG_TRIVIAL(info) << "tick tock: " << (*count)--;
+        if (*count == 0) {
+            return false;
+        }
+        return true; });
 
     pause();
     return 0;

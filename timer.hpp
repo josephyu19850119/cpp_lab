@@ -1,19 +1,29 @@
+_Pragma("once");
+
 #include <chrono>
 #include <thread>
 #include <atomic>
-#include <boost/log/trivial.hpp>
-
-// 可以通过让TIMER_CALLBACK返回false,取消当前timer
-typedef bool (*TIMER_CALLBACK)(void *data);
+#include <functional>
 
 class timer
 {
-public:
-    void set(std::chrono::duration<int, std::micro> interval, void *user_data, TIMER_CALLBACK callback)
+    class timer_context
     {
-        std::thread([=]
-                    { 
-                        while(!this->m_canceled) 
+        friend timer;
+        std::atomic_bool canceled{false};
+    };
+
+public:
+    using timer_handle = timer_context *;
+
+    // 可以通过让TIMER_CALLBACK返回false,取消当前timer
+    typedef std::function<bool(void *)> TIMER_CALLBACK;
+
+    static timer_handle set(std::chrono::duration<int, std::micro> interval, void *user_data, TIMER_CALLBACK callback)
+    {
+        timer_handle t = new timer_context();
+        std::thread([=] { 
+                        while(!t->canceled) 
                         {
                             std::this_thread::sleep_for(interval);
                             if (callback(user_data) == false)
@@ -23,19 +33,11 @@ public:
                         } })
             .detach();
 
-        m_canceled = false;
+        return t;
     }
 
-    void cancel()
+    static void cancel(timer_handle t)
     {
-        m_canceled = true;
+        t->canceled = true;
     }
-
-    ~timer()
-    {
-        m_canceled = true;
-    }
-
-private:
-    std::atomic_bool m_canceled;
 };
