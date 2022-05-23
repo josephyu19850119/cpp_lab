@@ -1,15 +1,34 @@
 #include <iostream>
-
+#include <thread>
+#include <string>
 using namespace std;
 
-#include <boost/version.hpp>
+void func(int n, string &s)
+{
+    cout << "Print int value: " << n << endl;
+    cout << "Print original string reference: " << s << endl;
+
+    // Update string content by reference
+    s = "updated content";
+}
+
+template <typename func, typename... _Args>
+void caller(func f, int priority, _Args &&...__args)
+{
+    thread([&]()
+           {
+        cout << "set thread priority: " << priority << endl;
+        f(__args...); })
+        .join();
+}
 
 int main(int argc, char **argv)
 {
-    cout << "Hello C++ lab" << endl;
+    string s = "mutable string content";
 
-    cout << "C++ std: " << __cplusplus << endl;
-    cout << "boost version: " << BOOST_LIB_VERSION << endl;
+    caller(func, 1, 666, s);
+
+    cout << "Print updated string content by new thread: " << s << endl;
 
     return 0;
 }
