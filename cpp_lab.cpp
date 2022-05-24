@@ -1,15 +1,20 @@
-#include <iostream>
+#include "unios_task.h"
 
+#include <iostream>
+#include <string>
 using namespace std;
 
-#include <boost/version.hpp>
+#include <unistd.h>
 
 int main(int argc, char **argv)
 {
-    cout << "Hello C++ lab" << endl;
+    UniOS::Task::Launch([](const string& str){
+        UniOS::Task::SubTask([](){
+            cout << "in sub Task" << endl;
+        });
+        cout  << str << endl;
+    }, UniOS::Task::TaskPriority::P10, false, "yuyue");
 
-    cout << "C++ std: " << __cplusplus << endl;
-    cout << "boost version: " << BOOST_LIB_VERSION << endl;
-
+    sleep(5);
     return 0;
 }
