@@ -1,5 +1,7 @@
 #include <sched.h>
 #include <thread>
+#include <optional>
+
 namespace UniOS
 {
     struct Task
@@ -40,18 +42,19 @@ namespace UniOS
         // priority：Task优先级，默认为最低P0
         // isExclusive: 是否为独占调度方式，如果是，CPU一旦分配给某一task线程，则不会在相同优先级Task之间轮询，直到任务完成或进入等待状态或被更高优先级任务抢占，默认为非独占
         // args: 传给worker的可变参数列表
+        // 返回: 如按预期创建thread，则在optional中被返回，否则返回空optional
         template <typename Worker, typename... Args>
-        static bool Launch(Worker worker,
+        static std::optional<std::thread> Launch(Worker worker,
                            TaskPriority priority = TaskPriority::P0, bool isExclusive = false,
                            Args &&...args)
         {
             // Task只能被非task运行线程开启，task线程可以再进一步开启SubTask，但不能再开启Task
             if (workerContext.inTask != WorkerContext::InTask::OutTask)
             {
-                return false;
+                return std::optional<std::thread>();
             }
 
-            std::thread([&]()
+            return std::thread([&]()
             {
                 // 将任务与当前线程的关系、线程优先级、调度方式保存thread local storage中
 
@@ -68,9 +71,7 @@ namespace UniOS
 
                 // 开始运行task代码
                 worker(args...);
-            }).detach();
-            
-            return true;
+            });
         }
 
         // 启动一个SubTask
@@ -78,39 +79,39 @@ namespace UniOS
         // priority：SubTask优先级，默认为居中的Regular
         // isExclusive: 与Launch函数同名参数意义相同，另外Exclusive Task开启的SubTask都是Exclusive，此参数可忽略；非Exclusive Task开启的SubTask是否为Exclusive由此参数决定
         // args: 传给worker的可变参数列表
+        // 返回: 如按预期创建thread，则在optional中被返回，否则返回空optional
         template <typename Worker, typename... Args>
-        static bool SubTask(Worker worker, SubTaskPriority priority = SubTaskPriority::Regular, bool isExclusive = false,
+        static std::optional<std::thread> SubTask(Worker worker, SubTaskPriority priority = SubTaskPriority::Regular, bool isExclusive = false,
                             Args &&...args)
         {
             // SubTask只能被Task或SubTask线程开启，而不能被Task以外线程开启
-            if (workerContext.inTask != WorkerContext::InTask::MainTask || workerContext.inTask != WorkerContext::InTask::SubTask)
+            if (workerContext.inTask != WorkerContext::InTask::MainTask && workerContext.inTask != WorkerContext::InTask::SubTask)
             {
-                return false;
+                return std::optional<std::thread>();
             }
 
-            std::thread([&]()
-                        {
-            // 当前线程为SubTask线程
-            workerContext.inTask = WorkerContext::InTask::SubTask;
-
-            // 根据当前Task优先级和SubTask优先级参数priority，设置Linux定义的线程优先级
-            sched_param priorityParma;
-            priorityParma.sched_priority = workerContext.taskPriorty + static_cast<int>(priority);
-
-            // 根据isExclusive参数的说明，设置SubTask线程调度策略
-            if (isExclusive || workerContext.isExclusive)
+            return std::thread([&]()
             {
-                sched_setscheduler(0, SCHED_FIFO, &priorityParma);
-            }
-            else
-            {
-                sched_setscheduler(0, SCHED_RR, &priorityParma);
-            }
+                // 当前线程为SubTask线程
+                workerContext.inTask = WorkerContext::InTask::SubTask;
 
-            // 开始运行task代码
-            worker(args...); })
-                .detach();
-            return true;
+                // 根据当前Task优先级和SubTask优先级参数priority，设置Linux定义的线程优先级
+                sched_param priorityParma;
+                priorityParma.sched_priority = workerContext.taskPriorty + static_cast<int>(priority);
+
+                // 根据isExclusive参数的说明，设置SubTask线程调度策略
+                if (isExclusive || workerContext.isExclusive)
+                {
+                    sched_setscheduler(0, SCHED_FIFO, &priorityParma);
+                }
+                else
+                {
+                    sched_setscheduler(0, SCHED_RR, &priorityParma);
+                }
+
+                // 开始运行task代码
+                worker(args...);
+            });
         }
 
     private:
