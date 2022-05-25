@@ -1,5 +1,6 @@
 #include <sched.h>
 #include <thread>
+#include <bitset>
 #include <optional>
 
 namespace UniOS
@@ -37,15 +38,20 @@ namespace UniOS
             Low4 = -4
         };
 
+        // 用于限定Task只可以在哪些CPU上运行，目前最多支持在64个CPU上进行选择
+        // 比如在8核CPU上指定第一个和第三个核心,可以用CpuSet("00000101")
+        using CpuSet = std::bitset<64>;
+
         // 启动一个Task
         // worker: Task的运行代码，可以是任何可调用(_Callable)类型对象，包括function pointer、function objects、 std::function object，lambda表达式
         // priority：Task优先级，默认为最低P0
         // isExclusive: 是否为独占调度方式，如果是，CPU一旦分配给某一task线程，则不会在相同优先级Task之间轮询，直到任务完成或进入等待状态或被更高优先级任务抢占，默认为非独占
+        // cpuSet: 限定在某些CPU上运行，默认所有CPU可用
         // args: 传给worker的可变参数列表
         // 返回: 如按预期创建thread，则在optional中被返回，否则返回空optional
         template <typename Worker, typename... Args>
         static std::optional<std::thread> Launch(Worker worker,
-                           TaskPriority priority = TaskPriority::P0, bool isExclusive = false,
+                           TaskPriority priority = TaskPriority::P0, bool isExclusive = false, CpuSet cpuSet = UINT64_MAX,
                            Args &&...args)
         {
             // Task只能被非task运行线程开启，task线程可以再进一步开启SubTask，但不能再开启Task
@@ -54,8 +60,29 @@ namespace UniOS
                 return std::optional<std::thread>();
             }
 
-            return std::thread([&]()
+            return std::thread([&worker, &args...](TaskPriority priority, bool isExclusive, CpuSet cpuSet)
             {
+                // 如果限定了可用CPU，则进行相关设置
+                if (!cpuSet.all())
+                {
+                    cpu_set_t cpu_set;
+                    CPU_ZERO(&cpu_set);
+
+                    for(std::size_t i = 0; i < cpuSet.size(); ++i)
+                    {
+                        if(cpuSet[i])
+                        {
+                            CPU_SET(i, &cpu_set);
+                        }
+                    }
+
+                    if (sched_setaffinity(0, sizeof(cpu_set), &cpu_set) != 0)
+                    {
+                        // TODO: return erro info to caller
+                        return;
+                    }
+                }
+
                 // 将任务与当前线程的关系、线程优先级、调度方式保存thread local storage中
 
                 workerContext.inTask = WorkerContext::InTask::MainTask;
@@ -67,21 +94,26 @@ namespace UniOS
                 sched_param priorityParma;
                 priorityParma.sched_priority = workerContext.taskPriorty;
 
-                sched_setscheduler(0, (isExclusive ? SCHED_FIFO : SCHED_RR), &priorityParma);
+                if (sched_setscheduler(0, (isExclusive ? SCHED_FIFO : SCHED_RR), &priorityParma) != 0)
+                {
+                    // TODO: return erro info to caller
+                    return;
+                }
 
                 // 开始运行task代码
                 worker(args...);
-            });
+            }, priority, isExclusive, cpuSet);
         }
 
         // 启动一个SubTask
         // worker: SubTask的运行代码，可以是任何可调用(_Callable)类型对象，包括function pointer、function objects、 std::function object，lambda表达式
         // priority：SubTask优先级，默认为居中的Regular
         // isExclusive: 与Launch函数同名参数意义相同，另外Exclusive Task开启的SubTask都是Exclusive，此参数可忽略；非Exclusive Task开启的SubTask是否为Exclusive由此参数决定
+        // cpuSet: 限定在某些CPU上运行，默认所有CPU可用
         // args: 传给worker的可变参数列表
         // 返回: 如按预期创建thread，则在optional中被返回，否则返回空optional
         template <typename Worker, typename... Args>
-        static std::optional<std::thread> SubTask(Worker worker, SubTaskPriority priority = SubTaskPriority::Regular, bool isExclusive = false,
+        static std::optional<std::thread> SubTask(Worker worker, SubTaskPriority priority = SubTaskPriority::Regular, bool isExclusive = false, CpuSet cpuSet = UINT64_MAX,
                             Args &&...args)
         {
             // SubTask只能被Task或SubTask线程开启，而不能被Task以外线程开启
@@ -90,8 +122,28 @@ namespace UniOS
                 return std::optional<std::thread>();
             }
 
-            return std::thread([&]()
+            return std::thread([&worker, &args...](SubTaskPriority priority, bool isExclusive, CpuSet cpuSet)
             {
+                // 如果限定了可用CPU，则进行相关设置
+                if (!cpuSet.all())
+                {
+                    cpu_set_t cpu_set;
+                    CPU_ZERO(&cpu_set);
+
+                    for(std::size_t i = 0; i < cpuSet.size(); ++i)
+                    {
+                        if(cpuSet[i])
+                        {
+                            CPU_SET(i, &cpu_set);
+                        }
+                    }
+
+                    if (sched_setaffinity(0, sizeof(cpu_set), &cpu_set) != 0)
+                    {
+                        // TODO: return erro info to caller
+                        return;
+                    }
+                }
                 // 当前线程为SubTask线程
                 workerContext.inTask = WorkerContext::InTask::SubTask;
 
@@ -100,18 +152,15 @@ namespace UniOS
                 priorityParma.sched_priority = workerContext.taskPriorty + static_cast<int>(priority);
 
                 // 根据isExclusive参数的说明，设置SubTask线程调度策略
-                if (isExclusive || workerContext.isExclusive)
+                if (sched_setscheduler(0, (isExclusive || workerContext.isExclusive) ? SCHED_FIFO : SCHED_RR, &priorityParma) != 0)
                 {
-                    sched_setscheduler(0, SCHED_FIFO, &priorityParma);
-                }
-                else
-                {
-                    sched_setscheduler(0, SCHED_RR, &priorityParma);
+                    // TODO: return erro info to caller
+                    return;
                 }
 
                 // 开始运行task代码
                 worker(args...);
-            });
+            }, priority, isExclusive, cpuSet);
         }
 
     private:
