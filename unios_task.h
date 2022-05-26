@@ -87,12 +87,12 @@ namespace UniOS
 
                 workerContext.inTask = WorkerContext::InTask::MainTask;
                 // 根据priority参数设置线程的Linux定义的优先级，具体说明见https://linux.die.net/man/2/sched_setscheduler
-                workerContext.taskPriorty = static_cast<int>(priority) * 9 + 5;
+                workerContext.systemPriorty = static_cast<int>(priority) * 9 + 5;
                 workerContext.isExclusive = isExclusive;
 
                 // 根据priority和isExclusive参数，设置Linux定义的优先级和调度策略，也参考上面链接
                 sched_param priorityParma;
-                priorityParma.sched_priority = workerContext.taskPriorty;
+                priorityParma.sched_priority = workerContext.systemPriorty;
 
                 if (sched_setscheduler(0, (isExclusive ? SCHED_FIFO : SCHED_RR), &priorityParma) != 0)
                 {
@@ -122,7 +122,7 @@ namespace UniOS
                 return std::optional<std::thread>();
             }
 
-            return std::thread([&worker, &args...](SubTaskPriority priority, bool isExclusive, CpuSet cpuSet)
+            return std::thread([&worker, &args...](int systemPriority, SubTaskPriority priority, bool isExclusive, CpuSet cpuSet)
             {
                 // 如果限定了可用CPU，则进行相关设置
                 if (!cpuSet.all())
@@ -147,9 +147,9 @@ namespace UniOS
                 // 当前线程为SubTask线程
                 workerContext.inTask = WorkerContext::InTask::SubTask;
 
-                // 根据当前Task优先级和SubTask优先级参数priority，设置Linux定义的线程优先级
+                // 根据所在Task系统定义优先级和SubTask优先级参数priority，设置Linux定义的线程优先级
                 sched_param priorityParma;
-                priorityParma.sched_priority = workerContext.taskPriorty + static_cast<int>(priority);
+                priorityParma.sched_priority = systemPriority + static_cast<int>(priority);
 
                 // 根据isExclusive参数的说明，设置SubTask线程调度策略
                 if (sched_setscheduler(0, (isExclusive || workerContext.isExclusive) ? SCHED_FIFO : SCHED_RR, &priorityParma) != 0)
@@ -160,7 +160,7 @@ namespace UniOS
 
                 // 开始运行task代码
                 worker(args...);
-            }, priority, isExclusive, cpuSet);
+            }, workerContext.systemPriorty, priority, isExclusive, cpuSet);
         }
 
     private:
@@ -177,7 +177,7 @@ namespace UniOS
             };
             InTask inTask = InTask::OutTask;
 
-            int taskPriorty;
+            int systemPriorty;// 当前task对应的实际系统定义的线程优先级
             bool isExclusive;
         };
 
