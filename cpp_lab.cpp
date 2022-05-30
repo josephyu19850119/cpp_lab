@@ -24,8 +24,24 @@ int main(int argc, char **argv)
 
     lowPriorityTask = UniOS::Task::Launch([]()
     {
+        timespec tp;
+        if (sched_rr_get_interval(0, &tp) != 0)
+        {
+            cerr << "sched_rr_get_interval FAILED" << endl;
+            exit(-1);
+        }
+        cout << "In lowPriorityTask, tp.tv_sec: " << tp.tv_sec << "; tp.tv_nsec: " << tp.tv_nsec << endl;
+
         highSubTaskInLowPriorityTask = UniOS::Task::SubTask([]()
         {
+            timespec tp;
+            if (sched_rr_get_interval(0, &tp) != 0)
+            {
+                cerr << "sched_rr_get_interval FAILED" << endl;
+                exit(-1);
+            }
+            cout << "In highSubTaskInLowPriorityTask, tp.tv_sec: " << tp.tv_sec << "; tp.tv_nsec: " << tp.tv_nsec << endl;
+
             // 确保4个待测试task在开始执行测试代码前，都进入可调度状态
             int ret = pthread_barrier_wait(&barrier);
             if (ret != PTHREAD_BARRIER_SERIAL_THREAD && ret != 0)
@@ -64,8 +80,24 @@ int main(int argc, char **argv)
 
     highPriorityTask = UniOS::Task::Launch([]()
     {
+        timespec tp;
+        if (sched_rr_get_interval(0, &tp) != 0)
+        {
+            cerr << "sched_rr_get_interval FAILED" << endl;
+            exit(-1);
+        }
+        cout << "In highPriorityTask, tp.tv_sec: " << tp.tv_sec << "; tp.tv_nsec: " << tp.tv_nsec << endl;
+
         lowSubTaskInHighPriorityTask = UniOS::Task::SubTask([]()
         {
+            timespec tp;
+            if (sched_rr_get_interval(0, &tp) != 0)
+            {
+                cerr << "sched_rr_get_interval FAILED" << endl;
+                exit(-1);
+            }
+            cout << "In lowSubTaskInHighPriorityTask, tp.tv_sec: " << tp.tv_sec << "; tp.tv_nsec: " << tp.tv_nsec << endl;
+
             // 确保4个待测试task在开始执行测试代码前，都进入可调度状态
             int ret = pthread_barrier_wait(&barrier);
             if (ret != PTHREAD_BARRIER_SERIAL_THREAD && ret != 0)
