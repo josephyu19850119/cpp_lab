@@ -23,7 +23,7 @@ int main(void)
 {
     // 先调用5次后取消
     atomic_int count{0};
-    timer::timer_context_t *t = timer::set(1, 0, &count, callback);
+    timer::timer_context_t *t = timer::set(10000000, &count, callback);
 
     while (count < 5)
     {
@@ -33,7 +33,7 @@ int main(void)
     timer::cancel(t);
 
     // 再调用5次后自行结束
-    t = timer::set(1, 0, &count, [](void *p)
+    t = timer::set(1000000, &count, [](void *p)
                    {
 
         int* i = reinterpret_cast<int*>(p);

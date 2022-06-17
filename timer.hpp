@@ -29,15 +29,15 @@ public:
         void *user_data = nullptr;
         TIMER_CALLBACK callback = nullptr;
     };
-    static timer_context_t *set(int seconds, int micro_seconds, void *user_data, TIMER_CALLBACK callback)
+    static timer_context_t *set(int micro_seconds, void *user_data, TIMER_CALLBACK callback)
     {
         timer_t timerid;
         timer_context_t *timer_context = new timer_context_t();
         timer_context->callback = callback;
         timer_context->user_data = user_data;
 
-        timer_context->trigger.it_value.tv_sec = seconds;
-        timer_context->trigger.it_value.tv_nsec = micro_seconds * 1000;
+        timer_context->trigger.it_value.tv_sec = micro_seconds / 1000000;
+        timer_context->trigger.it_value.tv_nsec = (micro_seconds % 1000000) * 1000;
         timer_context->sev.sigev_value.sival_ptr = timer_context;
         if (timer_create(CLOCK_REALTIME, &(timer_context->sev), &timerid) != 0)
         {
