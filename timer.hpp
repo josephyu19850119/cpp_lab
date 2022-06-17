@@ -22,6 +22,8 @@ private:
 
             sev.sigev_notify = SIGEV_THREAD;
             sev.sigev_notify_function = &thread_handler;
+
+            trigger.it_interval.tv_sec = 1;// 确保周期性触发
         }
         ~timer_context_t()
         {
@@ -76,11 +78,7 @@ private:
     {
         timer_context_t *timer_context = reinterpret_cast<timer_context_t *>(sv.sival_ptr);
 
-        if (timer_context->callback(timer_context->user_data))
-        {
-            timer_settime(timer_context->timerid, 0, &(timer_context->trigger), NULL);
-        }
-        else
+        if (!timer_context->callback(timer_context->user_data))
         {
             cancel(timer_context);
         }
