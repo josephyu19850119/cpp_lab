@@ -4,15 +4,17 @@ _Pragma("once");
 #include <time.h>
 #include <cstring>
 
+#include <functional>
+
 class timer
 {
 public:
     // 可以通过让TIMER_CALLBACK返回false,取消当前timer
-    typedef bool (*TIMER_CALLBACK)(void *data);
-
-    class timer_context_t
+    using TIMER_CALLBACK = std::function<bool(void*)>;
+    
+private:
+    struct timer_context_t
     {
-        friend timer;
         timer_context_t()
         {
             memset(&sev, 0, sizeof(struct sigevent));
@@ -20,6 +22,13 @@ public:
 
             sev.sigev_notify = SIGEV_THREAD;
             sev.sigev_notify_function = &thread_handler;
+        }
+        ~timer_context_t()
+        {
+            if (timerid != nullptr)
+            {
+                timer_delete(timerid);
+            }
         }
 
         timer_t timerid = nullptr;
@@ -29,6 +38,7 @@ public:
         void *user_data = nullptr;
         TIMER_CALLBACK callback = nullptr;
     };
+public:
     static timer_context_t *set(int micro_seconds, void *user_data, TIMER_CALLBACK callback)
     {
         timer_t timerid;
@@ -53,9 +63,11 @@ public:
         return timer_context;
     }
 
-    static void cancel(timer_context_t *timer_context)
+    using timer_handle = timer_context_t *;
+    static void cancel(timer_handle timer_context)
     {
         timer_delete(timer_context->timerid);
+        timer_context->timerid = nullptr;
         delete timer_context;
     }
 

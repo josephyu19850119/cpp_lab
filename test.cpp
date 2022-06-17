@@ -23,7 +23,7 @@ int main(void)
 {
     // 先调用5次后取消
     atomic_int count{0};
-    timer::timer_context_t *t = timer::set(10000000, &count, callback);
+    timer::timer_handle t = timer::set(1000000, &count, callback);
 
     while (count < 5)
     {
