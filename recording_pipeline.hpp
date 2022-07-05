@@ -2,11 +2,17 @@
 #include <string>
 #include <vector>
 
-#include <iostream>
-
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/containers/vector.hpp>
+
+namespace
+{
+    inline std::string domain_shared_memory_name_formatter(int domain_id)
+    {
+        return "unios_domain_" + std::to_string(domain_id) + "_shared_memory";
+    }
+}
 
 template <typename... _Types>
 class recording_pipe
@@ -32,26 +38,28 @@ public:
     class writer
     {
         friend recording_pipe<_Types...>;
-        typename recording_pipe<_Types...>::recording_pipe<_Types...>::record_pipe *p = nullptr;
+        std::string pipe_name;
         boost::interprocess::managed_shared_memory domain_shared_memory;
 
-        writer(int domain_id, const std::string &pipe_name, unsigned size)
+        writer(int domain_id, const std::string &_pipe_name, unsigned size)
+            : pipe_name(_pipe_name),
+              domain_shared_memory(boost::interprocess::managed_shared_memory{boost::interprocess::open_or_create, domain_shared_memory_name_formatter(domain_id).c_str(), size})
         {
-            std::string domain_shared_memory_name = "unios_domain_" + std::to_string(domain_id) + "_shared_memory";
-
-            boost::interprocess::shared_memory_object::remove(domain_shared_memory_name.c_str());
-            domain_shared_memory = boost::interprocess::managed_shared_memory{boost::interprocess::open_or_create, domain_shared_memory_name.c_str(), size};
-            p = domain_shared_memory.construct<record_pipe>(pipe_name.c_str())(domain_shared_memory.get_segment_manager());
+            domain_shared_memory.construct<record_pipe>(pipe_name.c_str())(domain_shared_memory.get_segment_manager());
         }
 
     public:
         void send(const record &rec)
         {
-            auto f = [this, rec]()
+            auto func = [this, rec]()
             {
-                this->p->push_back(rec);
+                std::pair<record_pipe *, std::size_t> pipe = domain_shared_memory.find<record_pipe>(pipe_name.c_str());
+                if (pipe.first != nullptr)
+                {
+                    (pipe.first)->push_back(rec);
+                }
             };
-            domain_shared_memory.atomic_func(f);
+            domain_shared_memory.atomic_func(func);
         }
     };
 
@@ -68,10 +76,9 @@ public:
         typename record_pipe::size_type offset = 0;
 
         reader(int domain_id, const std::string &_pipe_name)
-            : pipe_name(_pipe_name.c_str())
+            : pipe_name(_pipe_name)
         {
-            std::string domain_shared_memory_name = "unios_domain_" + std::to_string(0) + "_shared_memory";
-            domain_shared_memory = boost::interprocess::managed_shared_memory{boost::interprocess::open_only, domain_shared_memory_name.c_str()};
+            domain_shared_memory = boost::interprocess::managed_shared_memory{boost::interprocess::open_only, domain_shared_memory_name_formatter(domain_id).c_str()};
         }
 
     public:
