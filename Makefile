@@ -1,4 +1,4 @@
-cpp_lab : cpp_lab.cpp
-	g++ -std=c++11 cpp_lab.cpp -o cpp_lab
+test : recording_pipeline.hpp test.cpp Makefile
+	g++ -std=c++17 -g -Wall test.cpp -pthread -lrt -o test
 clean :
-	rm cpp_lab
+	rm test
