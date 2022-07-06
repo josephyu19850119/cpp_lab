@@ -61,17 +61,24 @@ public:
         }
 
     public:
-        void write(const message &msg)
+        bool write(const message &msg)
         {
-            auto func = [this, msg]()
+            bool succeed = true;
+            auto func = [this, msg, &succeed]()
             {
                 std::pair<message_buffer *, std::size_t> ptr = domain_shared_memory.find<message_buffer>(channel_name.c_str());
                 if (ptr.first != nullptr)
                 {
                     (ptr.first)->push_back(msg);
                 }
+                else
+                {
+                    succeed = false;
+                }
             };
             domain_shared_memory.atomic_func(func);
+
+            return succeed;
         }
     };
 
@@ -86,6 +93,7 @@ public:
         std::string channel_name;
         boost::interprocess::managed_shared_memory domain_shared_memory;
         typename message_buffer::size_type offset = 0;
+        std::string err_text;
 
         reader(int domain_id, const std::string &_channel_name)
             : channel_name(_channel_name),
@@ -94,20 +102,26 @@ public:
         }
 
     public:
-        std::vector<message> read()
+        bool read(std::vector<message> &msgs)
         {
-            std::vector<message> result;
+            bool succeed = true;
+            err_text.clear();
 
-            auto func = [this, &result]()
+            auto func = [this, &succeed, &msgs]()
             {
                 std::pair<const message_buffer *, std::size_t> pipe = domain_shared_memory.find<message_buffer>(channel_name.c_str());
                 if (pipe.first != nullptr)
                 {
                     for (typename message_buffer::const_iterator iter = (pipe.first)->begin() + offset; iter != (pipe.first)->end(); ++iter)
                     {
-                        result.push_back(*iter);
+                        msgs.push_back(*iter);
                         ++offset;
                     }
+                }
+                else
+                {
+                    err_text = "Not found message channel: " + channel_name;
+                    succeed = false;
                 }
             };
 
@@ -117,10 +131,16 @@ public:
             }
             catch (const std::exception &e)
             {
-                 e.what();
+                err_text = e.what();
+                return false;
             }
 
-            return result;
+            return succeed;
+        }
+
+        std::string get_err_text() const
+        {
+            return err_text;
         }
     };
 
@@ -132,7 +152,6 @@ public:
         }
         catch (const std::exception &e)
         {
-            e.what();
             return std::optional<reader>();
         }
     }

@@ -20,7 +20,8 @@ int main()
     {
         return 0;
     }
-    std::vector<pipe_t::message> records = receiver.value().read();
+    std::vector<pipe_t::message> records;
+    receiver.value().read(records);
     for (const pipe_t::message &rec : records)
     {
         std::cout << rec.name << ": ";
@@ -58,7 +59,7 @@ int main()
     sender.write(pipe_t::message("bool", true));
     sender.write(pipe_t::message("text", boost::interprocess::string("oolololoolo")));
 
-    records = receiver.value().read();
+    receiver.value().read(records);
     for (const pipe_t::message &rec : records)
     {
         std::cout << rec.name << ": ";
