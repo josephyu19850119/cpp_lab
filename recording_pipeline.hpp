@@ -26,11 +26,13 @@ public:
     {
         boost::interprocess::string name;
         std::variant<Types...> value;
+        timeval timestamp;
 
         template <typename Type>
         message(const std::string &_name, Type _value)
             : name(_name.c_str()), value(_value)
         {
+            gettimeofday(&timestamp, nullptr);
         }
     };
 

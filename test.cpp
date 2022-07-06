@@ -15,7 +15,7 @@ int main()
     sender.write(pipe_t::message("int", 777));
     sender.write(pipe_t::message("double", 3.1415926));
 
-    optional< pipe_t::reader> receiver = pipe_t::open_reader(domain_id, "test");
+    optional<pipe_t::reader> receiver = pipe_t::open_reader(domain_id, "test");
     if (!receiver)
     {
         return 0;
@@ -24,6 +24,18 @@ int main()
     for (const pipe_t::message &rec : records)
     {
         std::cout << rec.name << ": ";
+        time_t t = rec.timestamp.tv_sec;
+
+        tm *tm = localtime(&t);
+        printf("%d-%d-%d %d:%d:%d.%ld\n",
+               1900 + tm->tm_year,
+               tm->tm_mon + 1,
+               tm->tm_mday,
+               tm->tm_hour,
+               tm->tm_min,
+               tm->tm_sec,
+               rec.timestamp.tv_usec);
+
         switch (rec.value.index())
         {
         case 0:
@@ -50,6 +62,17 @@ int main()
     for (const pipe_t::message &rec : records)
     {
         std::cout << rec.name << ": ";
+        time_t t = rec.timestamp.tv_sec;
+
+        tm *tm = localtime(&t);
+        printf("%d-%d-%d %d:%d:%d.%ld\n",
+               1900 + tm->tm_year,
+               tm->tm_mon + 1,
+               tm->tm_mday,
+               tm->tm_hour,
+               tm->tm_min,
+               tm->tm_sec,
+               rec.timestamp.tv_usec);
         switch (rec.value.index())
         {
         case 0:
