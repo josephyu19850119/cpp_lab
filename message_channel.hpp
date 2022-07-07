@@ -155,4 +155,24 @@ public:
             return std::optional<reader>();
         }
     }
+
+    static bool remove(int domain_id, const std::string &channel_name = "")
+    {
+        if (channel_name.empty())
+        {
+            return boost::interprocess::shared_memory_object::remove(domain_shared_memory_name_formatter(domain_id).c_str());
+        }
+        else
+        {
+            try
+            {
+                boost::interprocess::managed_shared_memory domain_shared_memory{boost::interprocess::open_only, domain_shared_memory_name_formatter(domain_id).c_str()};
+                return domain_shared_memory.destroy<message_buffer>(channel_name.c_str());
+            }
+            catch (const boost::interprocess::interprocess_exception &e)
+            {
+                return false;
+            }
+        }
+    }
 };
