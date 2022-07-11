@@ -1,15 +1,27 @@
 #include <iostream>
-
+#include <variant>
+#include <string>
+#include <vector>
 using namespace std;
 
-#include <boost/version.hpp>
+template <typename... Types>
+struct MyStruct {
+    template <typename Type>
+    MyStruct(Type val) : value(val) { }
 
-int main(int argc, char **argv)
-{
-    cout << "Hello C++ lab" << endl;
+    std::variant<Types...> value;
 
-    cout << "C++ std: " << __cplusplus << endl;
-    cout << "boost version: " << BOOST_LIB_VERSION << endl;
+    void Print() const {
+        ([&] {
+            if (get_if<Types>(&value))
+                cout << get<Types>(value) << endl;
+        }(), ...);
+    }
+};
 
-    return 0;
+int main() {
+    vector<MyStruct<int, double, string>> vals { 666, 3.14, "sososos" };
+
+    for (const auto &val : vals)
+        val.Print();
 }
