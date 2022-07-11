@@ -5,10 +5,14 @@ _Pragma("once");
 #include <vector>
 #include <optional>
 #include <iostream>
+#include <fstream>
 
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/containers/string.hpp>
 #include <boost/interprocess/containers/vector.hpp>
+#include <boost/format.hpp>
+
+#include <sys/time.h>
 
 namespace
 {
@@ -154,6 +158,65 @@ public:
         {
             return std::optional<reader>();
         }
+    }
+
+    static bool dump_message_channel(int domain_id, const std::string &channel_name, const std::string &dump_path = "")
+    {
+        std::ofstream output_file;
+        if (!dump_path.empty())
+        {
+            output_file.open(dump_path);
+            if (!output_file.is_open())
+            {
+                return false;
+            }
+        }
+
+        std::ostream &output = output_file.is_open() ? output_file : std::cout;
+
+        try
+        {
+            boost::interprocess::managed_shared_memory domain_shared_memory{boost::interprocess::open_only, domain_shared_memory_name_formatter(domain_id).c_str()};
+            std::pair<const message_buffer *, std::size_t> channel =  domain_shared_memory.find<message_buffer>(channel_name.c_str());
+            if (channel.first == nullptr)
+            {
+                return false;
+            }
+
+            auto func = [channel, &output](){
+                for(const message& msg : *(channel.first))
+                {
+                    time_t t = msg.timestamp.tv_sec;
+                    tm *tm = localtime(&t);
+                    std::string timestamp_str = (boost::format("%02d-%02d-%02d %02d:%02d:%02d.%06ld") 
+                        % (tm->tm_year + 1900) 
+                        % (tm->tm_mon + 1) 
+                        % tm->tm_mday 
+                        % tm->tm_hour
+                        % tm->tm_min
+                        % tm->tm_sec 
+                        % (msg.timestamp.tv_usec))
+                        .str();
+
+
+                    output << timestamp_str << " ";
+                    output << msg.name << ": ";
+                    std::visit([&output](const auto& val){
+                        output << val << std::endl;
+                    }, msg.value);
+                }          
+            };
+
+            domain_shared_memory.atomic_func(func);
+
+            return true;
+        }
+        catch (const boost::interprocess::interprocess_exception &e)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     static bool remove(int domain_id, const std::string &channel_name = "")
