@@ -27,7 +27,7 @@ _Pragma("once")
 
     namespace
     {
-        void init(boost::log::trivial::severity_level aware_level = info, const std::string &log_file_path = "")
+        void init(boost::log::trivial::severity_level aware_level = info, const std::string &log_file_path = "", bool auto_flush = false)
         {
             typedef boost::log::sinks::synchronous_sink<boost::log::sinks::text_ostream_backend> text_sink;
             boost::shared_ptr<text_sink> sink = boost::make_shared<text_sink>();
@@ -42,6 +42,8 @@ _Pragma("once")
                 sink->locked_backend()->add_stream(
                     boost::make_shared<std::ofstream>(log_file_path));
             }
+
+            sink->locked_backend()->auto_flush(auto_flush);
 
             sink->set_formatter([](boost::log::record_view const &rec, boost::log::formatting_ostream &strm)
                                 {
