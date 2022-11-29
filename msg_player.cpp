@@ -45,7 +45,8 @@ int main(int argc, char *argv[])
     }
 
     cerr << "Recorded messsages count: " << msgs.messages_size() << endl;
-    cerr << "duration: " << (high_resolution_clock::now() - start_time_point).count() << endl;
+    duration<float> d = (high_resolution_clock::now() - start_time_point);
+    cerr << "duration: " << d.count() << endl;
 
     google::protobuf::ShutdownProtobufLibrary();
 
