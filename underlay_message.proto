@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package semidrive.protobuf.common;
+
+message UnderlayMessage {
+    optional fixed64 timestamp = 1;
+    optional int32 seq = 2;
+    optional bytes data = 3;
+    optional string data_type = 4;
+    optional string topic_name = 5; 
+}
+
+message MessageStream {
+    repeated UnderlayMessage messages = 1;
+}
