@@ -1,15 +1,32 @@
 #include <iostream>
-
 using namespace std;
 
-#include <boost/version.hpp>
+#include <curses.h>
 
 int main(int argc, char **argv)
 {
-    cout << "Hello C++ lab" << endl;
+    bool suspend = false;
 
-    cout << "C++ std: " << __cplusplus << endl;
-    cout << "boost version: " << BOOST_LIB_VERSION << endl;
+    initscr();
+    noecho();
+    nodelay(stdscr, true);
+
+    atexit([]()
+           { endwin(); });
+
+    while (true)
+    {
+        switch (getch())
+        {
+        case ' ':
+            suspend = !suspend;
+            nodelay(stdscr, !suspend);
+            break;
+        case '\n':
+            return 0;
+        }
+        cout << "tick";
+    }
 
     return 0;
 }
